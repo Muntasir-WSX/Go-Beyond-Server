@@ -43,10 +43,13 @@ async function run() {
       const id = req.params.id;
       // সরাসরি ObjectId ইম্পোর্ট করে ব্যবহার করা ভালো
       const { ObjectId } = require('mongodb');
-      const query = { _id: new ObjectId(id) };
+      const query = { _id: new ObjectId(id) };  
       const result = await tourCollection.findOne(query);
       res.send(result);
     });
+
+
+    
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
