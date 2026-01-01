@@ -3,6 +3,7 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const { ObjectId } = require('mongodb');
 require('dotenv').config();
 
 // middleware
@@ -48,6 +49,37 @@ async function run() {
       res.send(result);
     });
 
+
+    // ১. বুকিং কালেকশন তৈরি করুন
+const bookingCollection = client.db('GoBeyond').collection('bookings');
+
+// ২. বুকিং পোস্ট করার API (বুকিং সেভ + বুকিং কাউন্ট বৃদ্ধি)
+app.post('/bookings', async (req, res) => {
+    const bookingData = req.body;
+    const { ObjectId } = require('mongodb');
+
+    // স্টেপ ১: বুকিং ডেটাbookings কালেকশনে সেভ করা
+    const bookingResult = await bookingCollection.insertOne(bookingData);
+
+    // স্টেপ ২: ওই নির্দিষ্ট ট্যুর প্যাকেজের bookingCount ১ বাড়ানো ($inc ব্যবহার করে)
+    const filter = { _id: new ObjectId(bookingData.tour_id) };
+    const updateDoc = {
+        $inc: { bookingCount: 1 } // এখানে ১ যোগ হবে অটোমেটিক
+    };
+
+    const updateResult = await tourCollection.updateOne(filter, updateDoc);
+
+    // দুইটার রেজাল্ট একসাথে পাঠানো
+    res.send({ bookingResult, updateResult });
+});
+
+// ৩. ইউজারের নিজের বুকিংগুলো দেখার API (My Bookings পেজের জন্য)
+app.get('/myBookings', async (req, res) => {
+    const email = req.query.email; // কুয়েরি প্যারামিটার হিসেবে ইমেইল আসবে
+    const query = { buyer_email: email };
+    const result = await bookingCollection.find(query).toArray();
+    res.send(result);
+});
 
     
     // Send a ping to confirm a successful connection
