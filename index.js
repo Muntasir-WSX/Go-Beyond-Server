@@ -62,15 +62,58 @@ async function run() {
     });
 
     // ৪. ইউজারের নিজস্ব বুকিং দেখার API
-    app.get('/myBookings', async (req, res) => {
-      const email = req.query.email;
-      if (!email) {
+// ৪. ইউজারের নিজস্ব বুকিং দেখার API (প্যাকেজ ডিটেইলস সহ)
+app.get('/myBookings', async (req, res) => {
+    const email = req.query.email;
+    if (!email) {
         return res.status(400).send({ message: "Email is required" });
-      }
-      const query = { buyer_email: email }; // ফ্রন্টএন্ড থেকে buyer_email হিসেবে পাঠালে এটি কাজ করবে
-      const result = await bookingCollection.find(query).toArray();
-      res.send(result);
-    });
+    }
+
+    try {
+        const result = await bookingCollection.aggregate([
+            {
+                $match: { buyer_email: email } 
+            },
+            {
+                // আপনার tour_id যদি string হিসেবে থাকে, তবে lookup এর জন্য একে ObjectId তে রূপান্তর করতে হবে
+                $addFields: {
+                    tourObjectId: { $toObjectId: "$tour_id" }
+                }
+            },
+            {
+                $lookup: {
+                    from: "tourpackages",      
+                    localField: "tourObjectId", 
+                    foreignField: "_id",        
+                    as: "packageInfo"           
+                }
+            },
+            {
+                $unwind: "$packageInfo" // অ্যারে থেকে ডাটাকে বের করে সরাসরি অবজেক্ট করে দেবে
+            },
+            {
+                $project: {
+                    _id: 1,
+                    status: 1,
+                    booking_date: 1,
+                    buyer_contact: 1,
+                    notes: 1,
+                    // প্যাকেজ টেবিল থেকে ডাটাগুলো নিয়ে আসা হচ্ছে
+                    tour_name: "$packageInfo.tour_name",
+                    destination: "$packageInfo.destination",
+                    departure_location: "$packageInfo.departure_location",
+                    departure_date: "$packageInfo.departure_date",
+                    guide_name: "$packageInfo.guide_name"
+                }
+            }
+        ]).toArray();
+
+        res.send(result);
+    } catch (error) {
+        console.error("Aggregation Error:", error);
+        res.status(500).send({ message: "Error fetching detailed bookings" });
+    }
+});
 
     // ৫. বুকিং স্ট্যাটাস আপডেট (Confirm/Complete Button)
     app.patch('/bookings/:id', async (req, res) => {
@@ -88,6 +131,19 @@ async function run() {
       const result = await bookingCollection.find().toArray();
       res.send(result);
     });
+
+    // ৭. নতুন ট্যুর প্যাকেজ অ্যাড করার API (PRIVATE)
+app.post('/tourPackages', async (req, res) => {
+    const packageData = req.body;
+    // ডাটাবেসে সেভ করার আগে ডেট ফরম্যাট ঠিক করা বা কাউন্ট সেট করা
+    const newPackage = {
+        ...packageData,
+        bookingCount: 0,
+        created_at: new Date()
+    };
+    const result = await tourCollection.insertOne(newPackage);
+    res.send(result);
+});
 
     await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB!");
