@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb'); // ObjectId একবারে এখানে ইম্পোর্ট করুন
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb'); 
 require('dotenv').config();
 
 // middleware
@@ -21,18 +21,18 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // await client.connect(); // প্রোডাকশনে এটি অনেক সময় দরকার হয় না, তবুও রাখতে পারেন
+    // await client.connect(); 
 
     const tourCollection = client.db('GoBeyond').collection('tourpackages');
     const bookingCollection = client.db('GoBeyond').collection('bookings');
 
-    // ১. সব ট্যুর প্যাকেজ পাওয়ার API
+    //  1. all tour packages API
     app.get('/tourPackages', async (req, res) => {
       const result = await tourCollection.find().toArray();
       res.send(result);
     });
 
-    // ২. সিঙ্গেল ট্যুর প্যাকেজ API
+    // ২. singele tour package API
     app.get('/tourpackages/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -40,20 +40,20 @@ async function run() {
       res.send(result);
     });
 
-    // ৩. বুকিং পোস্ট করা (বুকিং সেভ + বুকিং কাউন্ট বৃদ্ধি)
+    // ৩. Post Bokking (Booking save + Booking count update)
     app.post('/bookings', async (req, res) => {
       const bookingData = req.body;
       
-      // ডাটাবেসে সেভ করার আগে ডিফল্ট স্ট্যাটাস সেট করা ভালো
+      
       const newBooking = {
         ...bookingData,
         status: 'pending',
-        booking_date: new Date() // বুকিংয়ের সময় সেভ রাখা ভালো
+        booking_date: new Date() 
       };
 
       const bookingResult = await bookingCollection.insertOne(newBooking);
 
-      // ট্যুর প্যাকেজের bookingCount ১ বাড়ানো
+      // Booking count update
       const filter = { _id: new ObjectId(bookingData.tour_id) };
       const updateDoc = { $inc: { bookingCount: 1 } };
       const updateResult = await tourCollection.updateOne(filter, updateDoc);
@@ -61,9 +61,9 @@ async function run() {
       res.send({ bookingResult, updateResult });
     });
 
-    // ৪. ইউজারের নিজস্ব বুকিং দেখার API
-// ৪. ইউজারের নিজস্ব বুকিং দেখার API (প্যাকেজ ডিটেইলস সহ)
-app.get('/myBookings', async (req, res) => {
+    // ৪. User's own bookings API (with package details)
+
+    app.get('/myBookings', async (req, res) => {
     const email = req.query.email;
     if (!email) {
         return res.status(400).send({ message: "Email is required" });
@@ -75,7 +75,7 @@ app.get('/myBookings', async (req, res) => {
                 $match: { buyer_email: email } 
             },
             {
-                // আপনার tour_id যদি string হিসেবে থাকে, তবে lookup এর জন্য একে ObjectId তে রূপান্তর করতে হবে
+                // if needed, convert tour_id to ObjectId
                 $addFields: {
                     tourObjectId: { $toObjectId: "$tour_id" }
                 }
@@ -89,7 +89,7 @@ app.get('/myBookings', async (req, res) => {
                 }
             },
             {
-                $unwind: "$packageInfo" // অ্যারে থেকে ডাটাকে বের করে সরাসরি অবজেক্ট করে দেবে
+                $unwind: "$packageInfo" 
             },
             {
                 $project: {
@@ -98,7 +98,6 @@ app.get('/myBookings', async (req, res) => {
                     booking_date: 1,
                     buyer_contact: 1,
                     notes: 1,
-                    // প্যাকেজ টেবিল থেকে ডাটাগুলো নিয়ে আসা হচ্ছে
                     tour_name: "$packageInfo.tour_name",
                     destination: "$packageInfo.destination",
                     departure_location: "$packageInfo.departure_location",
@@ -115,7 +114,7 @@ app.get('/myBookings', async (req, res) => {
     }
 });
 
-    // ৫. বুকিং স্ট্যাটাস আপডেট (Confirm/Complete Button)
+    // 5. Booking status update (Confirm/Complete Button)
     app.patch('/bookings/:id', async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -126,16 +125,15 @@ app.get('/myBookings', async (req, res) => {
       res.send(result);
     });
 
-    // ৬. সব বুকিং (Admin এর জন্য হতে পারে)
+    // ৬. all bookings 
     app.get('/allBookings', async (req, res) => {
       const result = await bookingCollection.find().toArray();
       res.send(result);
     });
 
-    // ৭. নতুন ট্যুর প্যাকেজ অ্যাড করার API (PRIVATE)
-app.post('/tourPackages', async (req, res) => {
+    // ৭. NEW tOUR PACKAGE ADD API (PRIVATE)
+    app.post('/tourPackages', async (req, res) => {
     const packageData = req.body;
-    // ডাটাবেসে সেভ করার আগে ডেট ফরম্যাট ঠিক করা বা কাউন্ট সেট করা
     const newPackage = {
         ...packageData,
         bookingCount: 0,
@@ -144,6 +142,48 @@ app.post('/tourPackages', async (req, res) => {
     const result = await tourCollection.insertOne(newPackage);
     res.send(result);
 });
+
+    // ৮. নির্দিষ্ট গাইডের নিজস্ব প্যাকেজগুলো পাওয়ার API (Manage My Packages এর জন্য)
+    app.get('/myPackages', async (req, res) => {
+        const email = req.query.email;
+        if (!email) {
+            return res.status(400).send({ message: "Email is required" });
+        }
+        const query = { guide_email: email }; 
+        const result = await tourCollection.find(query).toArray();
+        res.send(result);
+    });
+
+    // ৯. প্যাকেজ ডিলিট করার API
+    app.delete('/tourPackages/:id', async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await tourCollection.deleteOne(query);
+        res.send(result);
+    });
+
+    // ১০. প্যাকেজ আপডেট করার API (PATCH)
+    app.patch('/updateTourPackage/:id', async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedData = req.body;
+        
+        const updateDoc = {
+            $set: {
+                tour_name: updatedData.tour_name,
+                image: updatedData.image,
+                duration: updatedData.duration,
+                departure_location: updatedData.departure_location,
+                destination: updatedData.destination,
+                price: updatedData.price,
+                departure_date: updatedData.departure_date,
+                package_details: updatedData.package_details,
+            },
+        };
+
+        const result = await tourCollection.updateOne(filter, updateDoc);
+        res.send(result);
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log("Connected to MongoDB!");
