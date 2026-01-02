@@ -8,13 +8,16 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// --- Middleware Fix ---
+// --- Middleware  ---
 app.use(cors({
     origin: [
-        'https://gobeyond-2f44a.web.app', 
-        'https://go-beyond-server-mu.vercel.app' // আপনার ভেরসেল ফ্রন্টএন্ড লিঙ্ক এখানে দিন
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'https://gobeyond-2f44a.web.app',
+        'https://gobeyond-2f44a.firebaseapp.com'
     ],
-    credentials: true, // কুকি আদান-প্রদানের জন্য এটি মাস্ট
+    credentials: true,
     optionsSuccessStatus: 200
 }));
 
@@ -43,22 +46,23 @@ async function run() {
 
             res.cookie('token', token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+                secure: true, 
+                sameSite: 'none',
             }).send({ success: true });
         });
 
         app.post('/logout', async (req, res) => {
             res.clearCookie('token', {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+                secure: true,
+                sameSite: 'none',
                 maxAge: 0
             }).send({ success: true });
         });
 
         // --- Tour Package APIs ---
-        app.get('/tourPackages', async (req, res) => {
+  
+        app.get('/tourpackages', async (req, res) => {
             const result = await tourCollection.find().toArray();
             res.send(result);
         });
@@ -70,7 +74,7 @@ async function run() {
             res.send(result);
         });
 
-        app.post('/tourPackages', async (req, res) => {
+        app.post('/tourpackages', async (req, res) => {
             const packageData = req.body;
             const newPackage = {
                 ...packageData,
@@ -93,14 +97,12 @@ async function run() {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const updatedData = req.body;
-            const updateDoc = {
-                $set: { ...updatedData },
-            };
+            const updateDoc = { $set: { ...updatedData } };
             const result = await tourCollection.updateOne(filter, updateDoc);
             res.send(result);
         });
 
-        app.delete('/tourPackages/:id', async (req, res) => {
+        app.delete('/tourpackages/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await tourCollection.deleteOne(query);
@@ -115,16 +117,20 @@ async function run() {
                 status: 'pending',
                 booking_date: new Date()
             };
+            
+          
             const bookingResult = await bookingCollection.insertOne(newBooking);
             const filter = { _id: new ObjectId(bookingData.tour_id) };
             const updateDoc = { $inc: { bookingCount: 1 } };
             await tourCollection.updateOne(filter, updateDoc);
+            
             res.send(bookingResult);
         });
 
         app.get('/myBookings', async (req, res) => {
             const email = req.query.email;
             if (!email) return res.status(400).send({ message: "Email is required" });
+            
             const result = await bookingCollection.aggregate([
                 { $match: { buyer_email: email } },
                 { $addFields: { tourObjectId: { $toObjectId: "$tour_id" } } },
